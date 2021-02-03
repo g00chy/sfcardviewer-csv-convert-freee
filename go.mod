@@ -1,4 +1,4 @@
-module csv
+module sfcard-freee-csv
 
 go 1.15
 

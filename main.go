@@ -6,6 +6,7 @@ import (
 	"log"
 	"math"
 	"os"
+	records "sfcard-freee-csv/records"
 	"strconv"
 	"time"
 
@@ -19,16 +20,17 @@ type transaction struct {
 	body string
 }
 
-type SfViewer struct {
-	day        string
-	inTeiki    string
-	inCorp     string
-	inStation  string
-	outTeiki   string
-	outCorp    string
-	outStation string
-	memo       string
-	price      string
+type sfViewer struct {
+	day         string
+	inTeiki     string
+	inCorp      string
+	inStation   string
+	outTeiki    string
+	outCorp     string
+	outStation  string
+	memo        string
+	price       string
+	remainPrice string
 }
 
 func readSheet(sheetName string) (*xlsx.Sheet, bool) {
@@ -46,82 +48,90 @@ func readSheet(sheetName string) (*xlsx.Sheet, bool) {
 	return sh, ok
 }
 
-func getSfViewerList(sh *xlsx.Sheet) []SfViewer {
-	var sfList []SfViewer
+func getSfViewerList(sh *xlsx.Sheet) []sfViewer {
+	var sfList []sfViewer
+	isFirst := true
 
 	sh.ForEachRow(func(r *xlsx.Row) error {
-		sf := SfViewer{
-			day:        r.GetCell(0).String(),
-			inTeiki:    r.GetCell(1).String(),
-			inCorp:     r.GetCell(2).String(),
-			inStation:  r.GetCell(3).String(),
-			outTeiki:   r.GetCell(4).String(),
-			outCorp:    r.GetCell(5).String(),
-			outStation: r.GetCell(6).String(),
-			price:      r.GetCell(7).String(),
-			memo:       r.GetCell(8).String(),
+		if isFirst {
+			isFirst = false
+		} else if r.GetCell(9).String() != "x" {
+			time, _ := r.GetCell(0).GetTime(false)
+			sf := sfViewer{
+				day:         time.Format("2006-01-02"),
+				inTeiki:     r.GetCell(1).String(),
+				inCorp:      r.GetCell(2).String(),
+				inStation:   r.GetCell(3).String(),
+				outTeiki:    r.GetCell(4).String(),
+				outCorp:     r.GetCell(5).String(),
+				outStation:  r.GetCell(6).String(),
+				price:       r.GetCell(7).String(),
+				remainPrice: r.GetCell(8).String(),
+				memo:        r.GetCell(9).String(),
+			}
+			sfList = append(sfList, sf)
 		}
-		sfList = append(sfList, sf)
 		return nil
-	})
+	}, xlsx.SkipEmptyRows)
 
 	return sfList
 }
 
-func writeCsv(sfList []SfViewer) {
+func writeCsv(sfList []sfViewer) {
 
 	records := getCsvData(sfList)
 
 	f, err := os.Create("file.csv")
+	defer f.Close()
+
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	w := csv.NewWriter(f)
 
-	w.Comma = ','    // デフォルトはカンマ区切りで出力される。変更する場合はこの rune 文字を変更する
-	w.UseCRLF = true // 改行文字を CRLF(\r\n) にする
+	w.Comma = ','
+	w.UseCRLF = true
 
-	for _, record := range records {
+	for _, record := range records.GetCSVData() {
 		if err := w.Write(record); err != nil {
+			fmt.Println(err)
 			log.Fatal(err)
 		}
 	}
+	w.Flush()
 }
 
-func getCsvData(sfList []SfViewer) [][]string {
-	records := [][]string{
-		{"取引日", "出金額", "入金額", "取引内容"},
-	}
+func getCsvData(sfList []sfViewer) records.Records {
 
 	for _, sf := range sfList {
-		var record []string
-		record = append(record, sf.day)
+		var r records.Record
+		r.SetDay(sf.day)
 
 		price, _ := strconv.ParseFloat(sf.price, 64)
 		if price == 0 {
 			continue
 		} else if price > 0 {
-			record = append(record, sf.price)
-			record = append(record, "")
+			r.SetPrice("-" + sf.price)
 		} else {
-			record = append(record, "")
-			record = append(record, strconv.FormatFloat(math.Abs(price), 'f', 0, 64))
+			r.SetPrice(strconv.FormatFloat(math.Abs(price), 'f', 0, 64))
 		}
 
+		r.SetRemainPrice(sf.remainPrice)
 		if len(sf.inCorp) > 0 {
 			body := sf.inCorp + " " + sf.inStation
 			if len(sf.outCorp) > 0 {
 				body = body + " - " + sf.outCorp + " " + sf.outStation
+			} else {
+				body = body + ":" + sf.memo
 			}
-			record = append(record, body)
+			r.SetBody(body)
 		} else {
-			record = append(record, sf.memo)
+			r.SetBody(sf.memo)
 		}
-		records = append(records, record)
+		r.AddRecordToRecords()
 	}
-
-	return records
+	return records.RecordData
 }
 
 func main() {
@@ -130,7 +140,6 @@ func main() {
 	if ok {
 		sfList := getSfViewerList(sh)
 		writeCsv(sfList)
-
 	} else {
 		panic("not readable")
 	}
