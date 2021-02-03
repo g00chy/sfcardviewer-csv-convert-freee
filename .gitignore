@@ -4,6 +4,11 @@
 *.dll
 *.so
 *.dylib
+csv
+file.csv
+*.xlsx
+vendor
+sfcard-freee-csv
 
 # Test binary, built with `go test -c`
 *.test
