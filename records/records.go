@@ -67,6 +67,6 @@ func (p Records) Less(i, j int) bool {
 
 func reverse() {
 	sort.SliceStable(RecordData, func(i, j int) bool {
-		return i < j
+		return i > j
 	})
 }

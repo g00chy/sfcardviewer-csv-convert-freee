@@ -11,6 +11,8 @@ import (
 	"time"
 
 	"github.com/tealeg/xlsx/v3"
+	"golang.org/x/text/encoding/japanese"
+	"golang.org/x/text/transform"
 )
 
 type transaction struct {
@@ -88,7 +90,7 @@ func writeCsv(sfList []sfViewer) {
 		log.Fatal(err)
 	}
 
-	w := csv.NewWriter(f)
+	w := csv.NewWriter(transform.NewWriter(f, japanese.ShiftJIS.NewEncoder()))
 
 	w.Comma = ','
 	w.UseCRLF = true
