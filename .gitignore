@@ -9,6 +9,7 @@ file.csv
 *.xlsx
 vendor
 sfcard-freee-csv
+freee-bank-scrape/index.html
 
 # Test binary, built with `go test -c`
 *.test
